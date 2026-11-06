@@ -63,7 +63,7 @@ int config_load(SimConfig *c, const char *ini) {
         char name[MAX_NAME],state_text[16],trajectory[MAX_PATH];
         int fields=sscanf(line,"%d,%63[^,],%d,%15[^,],%259[^,],%d,%f,%f",&id,name,&enabled,state_text,trajectory,&tx_array_id,&beam_azimuth,&beam_elevation);
         if (fields!=8) continue; /* header or malformed line */
-        if (c->nn>=MAX_NODES) { fclose(f); return 0; }
+        if (c->nn>=MAX_NODES || id<0 || id>3 || find_node(c,id)) { fclose(f); return 0; }
         Node *n=&c->nodes[c->nn]; NodePosition *p=&c->positions[c->np];
         memset(n,0,sizeof(*n)); memset(p,0,sizeof(*p));
         if (!parse_state(state_text,&n->tr_state)) { fclose(f); return 0; }
