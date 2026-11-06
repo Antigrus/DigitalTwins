@@ -328,7 +328,9 @@ typedef struct {
     float t, d, tau, vr, fd, fspl;
     float gtx_db, grx_db;
     float element_tx_power_dbm, pr_dbm;
-    int txid, rxid, txaid, rxaid, valid;
+    int txid, rxid, txaid, rxaid; /* original IDs, retained for reporting */
+    uint16_t index;               /* direct-cache key; array fields encode local slots */
+    uint8_t valid;
     Complex h;
 } ChannelResult;
 ```
@@ -356,15 +358,19 @@ typedef struct {
 ### 2.13 `TriNodesCalResult`：全局最新链路结果集合
 
 ```c
+#define LINK_INDEX_SPACE       (1U << 12)
+#define LINK_INDEX_BITMAP_SIZE (LINK_INDEX_SPACE / 8U)
+
 typedef struct {
-    ChannelResult links[MAX_LINK_RESULTS];
+    ChannelResult links[LINK_INDEX_SPACE];
+    uint8_t occupied[LINK_INDEX_BITMAP_SIZE];
     size_t count;
 } TriNodesCalResult;
 
 extern TriNodesCalResult g_tri_nodes_cal_result;
 ```
 
-全局对象由工程提供，`count` 表示当前登记的有向链路数。链路唯一键为 `(txid,rxid,txaid,rxaid)`，因此不同阵面组合也是不同链路。`TriNodesCalResult_Update()` 首先按该键查找：已存在则用新时刻的完整 `ChannelResult` 覆盖；不存在则追加。不同链路不会互相覆盖，同一链路保留最新一次计算值。`TriNodesCalResult_Init()` 清空结果集合。静态容量 `MAX_LINK_RESULTS = MAX_NODES*(MAX_NODES-1)*MAX_ARRAYS_PER_NODE*MAX_ARRAYS_PER_NODE`，超过容量时更新函数返回 0。默认上限为 15360 条记录，当前 `sizeof(TriNodesCalResult)` 约 1 MiB。`MAX_LINK_RESULTS` 支持编译宏覆盖，例如 `-DMAX_LINK_RESULTS=256`；降低该值可以节省 RAM，但必须确保容量覆盖实际链路数。若目标平台需要更精细的内存管理，也可将结果数组改为初始化时按配置容量分配。
+全局对象由工程提供，`count` 表示已登记的索引槽位数。`uint16_t index` 的位布局为 `[11:10]=txid`、`[9:8]=rxid`、`[7:4]=tx_array_slot`、`[3:0]=rx_array_slot`，因此索引空间为 `2^12=4096`。**阵面字段编码的是阵面在所属节点 `arrays[]` 中的槽位（0～15），不是 `ArrayMount.id`**：工程配置中的阵面 ID 11、21、31 等不能直接放入 4 bit，计算函数通过阵面指针相对 `Node.arrays` 的偏移取得槽位。节点 ID 必须在 0～3 范围内且在配置中唯一；工程当前限制最多 3 个节点。`TriNodesCalResult_Update()` 直接写入 `links[index]`，同一索引自然覆盖，不同索引互不影响，查找复杂度为 O(1)。`occupied` 位图区分未登记槽位和已登记但 `valid=0` 的结果；`TriNodesCalResult_Get()` 检查占用状态后返回对应记录。`TriNodesCalResult_Init()` 清空结果数组、位图和计数。索引空间固定为 4096 项；在最多 3 个节点、每节点最多 16 个阵面的约束下，实际最大有向链路数为 `3*2*16*16=1536`。该方案以较高的固定 RAM 占用换取 O(1) 查询，当前常见 32-bit `int`/`float` ABI 下 `sizeof(TriNodesCalResult)=279048` bytes（约 272.5 KiB）；移植到目标 MCU/DSP 时应使用目标编译器重新计算结构体大小。
 
 该对象是全局共享数据。若计算和结果上传在不同任务/中断上下文并发执行，必须由调用方提供临界区保护或双缓冲。
 
@@ -384,7 +390,7 @@ typedef struct {
 
 它是示例程序的配置根对象，包含仿真时间范围、节点数组和节点运动数据数组。`nn` 与 `np` 分别为实际节点数和运动对象数，正常情况下二者相等。
 
-当前实现使用固定容量数组：`MAX_NODES=16`，每节点 `MAX_ARRAYS_PER_NODE=8`。实际数量由 `nn`、`np`、`array_count` 决定，而不是必须填满数组。
+当前实现使用固定容量数组：`MAX_NODES=3`，每节点 `MAX_ARRAYS_PER_NODE=16`。节点 ID 为 0～3 的 2 bit 编码值且必须唯一；实际节点数由 `nn`、`np` 决定。阵面索引编码使用 `arrays[]` 槽位，因此每个节点的阵面数不得超过 16。
 
 ---
 
@@ -527,11 +533,11 @@ float beam_gain(const BeamTableCache *cache, int16_t index, float theta_deg, flo
 - 每节点阵面数量：`Node.array_count`，上限 `MAX_ARRAYS_PER_NODE`。
 - 唯一方向图数量：`BeamTableCache.count`，上限 `MAX_BEAM_TABLES`。
 
-因此，运行时可以是 1、2、3……个节点；每个节点也可以配置 0、1、2……个阵面，只要不超过编译期容量。代码不要求每个节点阵面数相同。
+因此，运行时可以配置 1～3 个节点；每个节点也可以配置 0～16 个阵面，只要不超过编译期容量。代码不要求每个节点阵面数相同。
 
 ### 4.2 增加节点数量
 
-当前 `MAX_NODES` 定义为 16。若系统需要更多节点：
+当前 `MAX_NODES` 定义为 3，链路索引中的节点 ID 字段为 2 bit（0～3）。若系统需要更多节点，必须重新设计 `uint16_t index` 的位分配，不能只提高该宏。
 
 1. 在 `sim.h` 中提高 `MAX_NODES`。
 2. 检查所有依赖该宏的静态数组，包括 `SimConfig.nodes[]`、`SimConfig.positions[]`、`g_node_positions[]`。
@@ -543,13 +549,7 @@ float beam_gain(const BeamTableCache *cache, int16_t index, float theta_deg, flo
 
 ### 4.3 增加每节点阵面数量
 
-当前 `MAX_ARRAYS_PER_NODE` 为 8。若每个节点可能挂载 12 个阵面，可将宏提高到 12 或更大：
-
-```c
-#define MAX_ARRAYS_PER_NODE 12
-```
-
-随后重新编译。配置解析器会根据 `node_id` 找到对应节点，将每条阵面记录追加到该节点的 `arrays[]`，并递增 `array_count`。主流程通过 `array_count` 遍历，不需要为“12 个阵面”专门增加 12 组代码。
+当前 `MAX_ARRAYS_PER_NODE` 为 16。由于链路索引为每个端点预留 4 bit 阵面槽位，不得超过 16；若需要更多阵面，必须重新设计索引位分配。随后重新编译。配置解析器会根据 `node_id` 找到对应节点，将每条阵面记录追加到该节点的 `arrays[]`，并递增 `array_count`。主流程通过 `array_count` 遍历，不需要为“12 个阵面”专门增加 12 组代码。
 
 注意：提高该宏会增大每个 `Node` 对象的内存占用。由于 `Node` 数组按 `MAX_NODES` 静态分配，节点上限和阵面上限同时提高时，内存增长近似为二者乘积。
 
