@@ -10,19 +10,23 @@ void TriNodesCalResult_Init(TriNodesCalResult *result) {
     if (result) memset(result,0,sizeof(*result));
 }
 
-static int same_link(const ChannelResult *a, const ChannelResult *b) {
-    return a->txid==b->txid && a->rxid==b->rxid && a->txaid==b->txaid && a->rxaid==b->rxaid;
+static int link_index_is_occupied(const TriNodesCalResult *result, uint16_t index) {
+    return (result->occupied[index >> 3] & (uint8_t)(1U << (index & 7U))) != 0U;
 }
 
 int TriNodesCalResult_Update(TriNodesCalResult *result, const ChannelResult *r) {
-    if (!result || !r) return 0;
-    for (size_t i=0;i<result->count;i++) if (same_link(&result->links[i],r)) {
-        result->links[i]=*r;
-        return 1;
+    if (!result || !r || r->index >= LINK_INDEX_SPACE) return 0;
+    if (!link_index_is_occupied(result, r->index)) {
+        result->occupied[r->index >> 3] |= (uint8_t)(1U << (r->index & 7U));
+        result->count++;
     }
-    if (result->count>=MAX_LINK_RESULTS) return 0;
-    result->links[result->count++]=*r;
+    result->links[r->index] = *r;
     return 1;
+}
+
+const ChannelResult *TriNodesCalResult_Get(const TriNodesCalResult *result, uint16_t index) {
+    if (!result || index >= LINK_INDEX_SPACE || !link_index_is_occupied(result, index)) return NULL;
+    return &result->links[index];
 }
 
 void BeamTable_Init(BeamTableCache *cache) {
