@@ -14,7 +14,7 @@
 /* index layout: [11:10] txid, [9:8] rxid, [7:4] tx array slot, [3:0] rx array slot.
    Array slots are positions in Node.arrays[], NOT ArrayMount.id values. */
 static inline bool LinkIndex_Encode(uint8_t txid, uint8_t rxid, uint8_t tx_slot, uint8_t rx_slot, uint16_t *index) {
-    if (!index || txid > 3U || rxid > 3U || tx_slot >= MAX_ARRAYS_PER_NODE || rx_slot >= MAX_ARRAYS_PER_NODE) return false;
+    if (!index || txid > 3U || rxid > 3U || txid == rxid || tx_slot >= MAX_ARRAYS_PER_NODE || rx_slot >= MAX_ARRAYS_PER_NODE) return false;
     *index = (uint16_t)(((uint16_t)txid << 10) | ((uint16_t)rxid << 8) | ((uint16_t)tx_slot << 4) | (uint16_t)rx_slot);
     return true;
   }
