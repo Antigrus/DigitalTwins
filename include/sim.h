@@ -5,11 +5,19 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define MAX_NODES              16
-#define MAX_ARRAYS_PER_NODE    8
-#ifndef MAX_LINK_RESULTS
-#define MAX_LINK_RESULTS       (MAX_NODES * (MAX_NODES - 1) * MAX_ARRAYS_PER_NODE * MAX_ARRAYS_PER_NODE)
-#endif
+#define MAX_NODES              3
+#define MAX_ARRAYS_PER_NODE    16
+#define LINK_INDEX_SPACE       (1U << 12) /* 2-bit TX node + 2-bit RX node + 4-bit TX/RX array slots */
+#define LINK_INDEX_BITMAP_SIZE (LINK_INDEX_SPACE / 8U)
+#define LINK_INDEX_INVALID     UINT16_MAX
+
+/* index layout: [11:10] txid, [9:8] rxid, [7:4] tx array slot, [3:0] rx array slot.
+   Array slots are positions in Node.arrays[], NOT ArrayMount.id values. */
+static inline bool LinkIndex_Encode(uint8_t txid, uint8_t rxid, uint8_t tx_slot, uint8_t rx_slot, uint16_t *index) {
+    if (!index || txid > 3U || rxid > 3U || tx_slot >= MAX_ARRAYS_PER_NODE || rx_slot >= MAX_ARRAYS_PER_NODE) return false;
+    *index = (uint16_t)(((uint16_t)txid << 10) | ((uint16_t)rxid << 8) | ((uint16_t)tx_slot << 4) | (uint16_t)rx_slot);
+    return true;
+  }
 #define MAX_PATH               260
 #define MAX_NAME               64
 #define NTH                    181
@@ -84,13 +92,16 @@ typedef struct {
     float t, d, tau, vr, fd, fspl;
     float gtx_db, grx_db;
     float element_tx_power_dbm, pr_dbm;
-    int txid, rxid, txaid, rxaid, valid;
+    int txid, rxid, txaid, rxaid;
+    uint16_t index;             /* direct-cache key; array fields are array slots */
+    uint8_t valid;
     Complex h;
 } ChannelResult;
 
 typedef struct {
-    ChannelResult links[MAX_LINK_RESULTS];
-    size_t count;
+    ChannelResult links[LINK_INDEX_SPACE];
+    uint8_t occupied[LINK_INDEX_BITMAP_SIZE];
+    size_t count;               /* number of occupied index entries */
 } TriNodesCalResult;
 
 typedef struct {
@@ -107,6 +118,7 @@ extern BeamTableCache g_beam_cache;
 extern TriNodesCalResult g_tri_nodes_cal_result;
 void TriNodesCalResult_Init(TriNodesCalResult *result);
 int TriNodesCalResult_Update(TriNodesCalResult *result, const ChannelResult *channel_result);
+const ChannelResult *TriNodesCalResult_Get(const TriNodesCalResult *result, uint16_t index);
 
 /* 3-D math and attitude */
 Vec3 v3(float x, float y, float z);
