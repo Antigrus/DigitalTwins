@@ -29,10 +29,14 @@ ChannelResult channel(const SimConfig *c, const Node *tx, const NodePosition *tp
                       const Node *rx, const NodePosition *rp,
                       const ArrayMount *ta, const ArrayMount *ra, float t) {
     ChannelResult o; memset(&o,0,sizeof(o));
+    o.index=LINK_INDEX_INVALID;
     o.t=t; o.txid=tx?tx->id:-1; o.rxid=rx?rx->id:-1;
     o.txaid=ta?ta->id:-1; o.rxaid=ra?ra->id:-1;
     if (!c || !tx || !rx || !tp || !rp || !ta || !ra || !tx->enabled || !rx->enabled ||
         !ta->enabled || !ra->enabled || tx->tr_state!=NODE_TX || rx->tr_state!=NODE_RX) return o;
+    ptrdiff_t tx_slot=ta-tx->arrays, rx_slot=ra-rx->arrays;
+    if (tx_slot<0 || tx_slot>=(ptrdiff_t)tx->array_count || rx_slot<0 || rx_slot>=(ptrdiff_t)rx->array_count ||
+        !LinkIndex_Encode((uint8_t)tx->id,(uint8_t)rx->id,(uint8_t)tx_slot,(uint8_t)rx_slot,&o.index)) return o;
     if (tx->tx_array_id>=0 && ta->id!=tx->tx_array_id) return o;
     if (fabsf(ta->beam_config.frequency_mhz-ra->beam_config.frequency_mhz)>1e-6f) return o;
 
@@ -69,8 +73,8 @@ ChannelResult channel(const SimConfig *c, const Node *tx, const NodePosition *tp
 
 void print_channel(ChannelResult r) {
     if (!r.valid) { printf("  H%d%d array %d->%d unavailable (state/frequency/config check)\n",r.txid,r.rxid,r.txaid,r.rxaid); return; }
-    printf("  H%d%d array %d->%d: d=%.3f m tau=%.4e s vr=%.3f m/s fd=%.3f Hz FSPL=%.2f dB "
+    printf("  H%d%d array %d->%d [index=%u]: d=%.3f m tau=%.4e s vr=%.3f m/s fd=%.3f Hz FSPL=%.2f dB "
            "Gtx=%.2f dB Grx=%.2f dB Pelem=%.2f dBm Pr=%.2f dBm h=(%+.4e,%+.4e)\n",
-           r.txid,r.rxid,r.txaid,r.rxaid,r.d,r.tau,r.vr,r.fd,r.fspl,r.gtx_db,r.grx_db,
+           r.txid,r.rxid,r.txaid,r.rxaid,(unsigned)r.index,r.d,r.tau,r.vr,r.fd,r.fspl,r.gtx_db,r.grx_db,
            r.element_tx_power_dbm,r.pr_dbm,r.h.re,r.h.im);
 }
