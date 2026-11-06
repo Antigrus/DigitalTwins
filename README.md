@@ -68,7 +68,7 @@
 
 每个节点指定 `tx_array_id>=0` 时，只使用该阵面发射；接收节点仍遍历其所有启用阵面。设为 `-1` 时，发射端也遍历全部启用阵面。
 
-全局 `g_tri_nodes_cal_result`（类型 `TriNodesCalResult`）保存每条有向节点/阵面链路的最新 `ChannelResult`。链路键为 `(txid, rxid, txaid, rxaid)`：首次计算追加记录，后续帧只覆盖同键记录，不会覆盖其他链路。`count` 表示当前已登记链路数，容量由 `MAX_LINK_RESULTS` 限制（默认最大配置上限为 15360 条记录，约 1 MiB）。可通过编译宏 `-DMAX_LINK_RESULTS=256` 等方式降低 RAM 占用，但必须确保容量覆盖实际链路数。多任务系统中若计算任务和上传任务并发访问，应在外层加临界区或采用双缓冲。
+全局 `g_tri_nodes_cal_result`（类型 `TriNodesCalResult`）采用 `uint16_t index` 作为链路唯一键，并使用直接索引缓存：`links[index]`。索引布局为 `[11:10]=txid`、`[9:8]=rxid`、`[7:4]=tx_array_slot`、`[3:0]=rx_array_slot`。注意，4 bit 阵面字段保存的是阵面在所属节点 `arrays[]` 中的槽位（0～15），不是 `ArrayMount.id`；例如阵面 ID 为 11、21、31 时仍可正确编码。`occupied` 位图用于区分尚未写入的槽位和已写入但 `valid=0` 的结果，`count` 表示已登记槽位数。缓存地址可由 `&g_tri_nodes_cal_result.links[index]` 直接得到，`TriNodesCalResult_Get()` 提供带占用检查的访问接口。索引空间为 4096 项；最多 3 个节点、每节点 16 个阵面时，实际有向链路上限为 1536 条。当前平台下结果缓存约占 272.5 KiB（具体值以目标编译器的 `sizeof(TriNodesCalResult)` 为准）。多任务系统中若计算任务和上传任务并发访问，应在外层加临界区或采用双缓冲。
 
 输出的接收功率估算采用单阵元发射功率作为输入：
 
