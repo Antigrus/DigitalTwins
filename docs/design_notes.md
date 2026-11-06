@@ -18,4 +18,4 @@
 
 - 节点 `tx_array_id` 保存指定发射阵面 ID，`-1` 表示自动选择；它引用 `ArrayMount.id`，不引用数组下标。
 - 节点 `beam_direction` 是阵面局部扫描偏移，单位为度。最终方向矩阵为 `R_node * R_mount * R_scan`，扫描不会改变阵面的安装姿态。
-- `g_tri_nodes_cal_result` 按 `(txid,rxid,txaid,rxaid)` 保存每条链路最新 `ChannelResult`；同键覆盖，不同键追加。访问同步由调用方负责。
+- `g_tri_nodes_cal_result` 使用 `uint16_t index` 作为链路键并直接索引 `links[index]`；位布局为 txid[11:10]、rxid[9:8]、TX 阵面槽位[7:4]、RX 阵面槽位[3:0]。阵面槽位是 `Node.arrays[]` 下标，不是可能大于 15 的 `ArrayMount.id`。`occupied` 位图区分未登记项与已登记但无效的结果；访问同步由调用方负责。
