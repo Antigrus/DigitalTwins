@@ -72,7 +72,7 @@ typedef struct {
     NodeTRState tr_state;
     Vec3 velocity;
     Attitude attitude;
-    int tx_array_id;              /* -1: automatic; otherwise ArrayMount.id */
+    int tx_array_id;              /* selected TX ArrayMount.id; -1: automatic selection */
     BeamDirection beam_direction; /* scan offset in each array local frame, degrees */
     ArrayMount arrays[MAX_ARRAYS_PER_NODE];
     size_t array_count;
