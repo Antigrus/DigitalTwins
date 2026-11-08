@@ -319,7 +319,7 @@ int tx_array_id;                 /* -1 自动选择；否则使用对应 ArrayMo
 BeamDirection beam_direction;   /* 相对阵面局部坐标系，单位度 */
 ```
 
-`tx_array_id` 保存的是阵面 ID，不是 `arrays[]` 下标。指定值必须对应本节点一个启用阵面；配置加载时会检查。值为 `-1` 时发射端遍历全部启用阵面。接收端仍遍历全部启用阵面。
+`tx_array_id` 保存的是指定发射阵面的 `ArrayMount.id`，不是 `arrays[]` 下标。指定值必须对应本节点一个启用阵面；配置加载时会检查。主循环枚举 TX 阵面时按该 ID 筛选，`channel()` 也会再次校验传入阵面 ID，保证直接调用接口时同样遵守节点选择。值为 `-1` 时发射端遍历全部启用阵面。接收端仍遍历全部启用阵面。当前示例为了简化测试，将节点 ID 与指定阵面 ID 设为相同的 1、2、3；真实部署时阵面 ID 可以独立编号。
 
 ### 2.12 `ChannelResult`：一次阵面到阵面的信道结果
 
@@ -787,9 +787,9 @@ arrays_csv=arrays.csv
 
 ```csv
 id,name,enabled,tr_state,trajectory_file,tx_array_id,beam_azimuth_deg,beam_elevation_deg
-1,Node1,1,TX,trajectories/node1.csv,11,0,0
-2,Node2,1,RX,trajectories/node2.csv,-1,0,0
-3,Node3,1,RX,trajectories/node3.csv,-1,0,0
+1,Node1,1,TX,trajectories/node1.csv,1,0,0
+2,Node2,1,RX,trajectories/node2.csv,2,0,0
+3,Node3,1,RX,trajectories/node3.csv,3,0,0
 ```
 
 每行对应一个节点。`tr_state` 是节点级半双工状态；轨迹文件路径对应 `NodePosition`。`tx_array_id` 指定发射阵面 ID，`-1` 为自动选择；扫描方位角/俯仰角定义在阵面局部坐标系，单位为度。
@@ -798,9 +798,9 @@ id,name,enabled,tr_state,trajectory_file,tx_array_id,beam_azimuth_deg,beam_eleva
 
 ```csv
 array_id,node_id,name,enabled,x,y,z,yaw,pitch,roll,num_h,num_v,spacing_h_cm,spacing_v_cm,frequency_mhz,element_tx_power_dbm
-11,1,A1,1,0,0,0,0,0,0,16,8,7.5,7.5,2000,20
-21,2,A2,1,0,0,0,0,0,0,16,8,7.5,7.5,2000,20
-31,3,A3,1,0,0,0,0,0,0,8,8,7.5,7.5,2000,18
+1,1,A1,1,0,0,0,0,0,0,16,8,7.5,7.5,2000,20
+2,2,A2,1,0,0,0,0,0,0,16,8,7.5,7.5,2000,20
+3,3,A3,1,0,0,0,0,0,0,8,8,7.5,7.5,2000,18
 ```
 
 每条记录通过 `node_id` 归属到一个节点。`x/y/z` 是阵面相对节点参考点的偏移，`yaw/pitch/roll` 是安装姿态。阵面参数映射到 `ArrayMount`：阵列参数写入 `beam_config`，单阵元功率写入 `element_tx_power_dbm`。
