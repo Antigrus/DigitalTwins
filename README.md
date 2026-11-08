@@ -48,7 +48,7 @@
 
 `id,name,enabled,tr_state,trajectory_file,tx_array_id,beam_azimuth_deg,beam_elevation_deg`
 
-`tr_state` 为 `TX` 或 `RX`，也可写 `1` 或 `0`。`tx_array_id` 是指定发射阵面的 **array_id**；`-1` 表示自动遍历该节点的所有启用阵面。指定 ID 必须存在且启用。`beam_azimuth_deg/beam_elevation_deg` 是波束扫描角，定义在节点各阵面的局部坐标系中；当前同一节点的阵面共用这组扫描角，既用于发射波束，也用于接收波束。默认 `0,0` 表示不扫描。方位角绕阵面局部 +Z 轴旋转，俯仰角使局部 +X 波束轴朝局部 +Z 方向抬起。
+`tr_state` 为 `TX` 或 `RX`，也可写 `1` 或 `0`。`tx_array_id` 是节点指定发射阵面的 **array_id**；`-1` 表示自动遍历该节点的所有启用阵面。指定 ID 必须存在且启用，且只会选择该节点所属的阵面。本次示例中为便于验证，节点 ID 与指定阵面 ID 相同（1、2、3）；实际系统中二者可以不同。`beam_azimuth_deg/beam_elevation_deg` 是波束扫描角，定义在节点各阵面的局部坐标系中；当前同一节点的阵面共用这组扫描角，既用于发射波束，也用于接收波束。默认 `0,0` 表示不扫描。方位角绕阵面局部 +Z 轴旋转，俯仰角使局部 +X 波束轴朝局部 +Z 方向抬起。
 
 `config/arrays.csv`：
 
@@ -66,7 +66,7 @@
 
 每条链路要求 Tx/Rx 阵面工作频率一致（误差不超过 `1e-6 MHz`），否则该阵面对链路不可用。
 
-每个节点指定 `tx_array_id>=0` 时，只使用该阵面发射；接收节点仍遍历其所有启用阵面。设为 `-1` 时，发射端也遍历全部启用阵面。
+每个节点指定 `tx_array_id>=0` 时，只使用本节点中 ID 匹配的阵面发射；主循环在枚举 TX 阵面时先过滤，`channel()` 内部也再次校验，避免调用方传入其他阵面导致错误计算。接收节点仍遍历其所有启用阵面。设为 `-1` 时，发射端遍历全部启用阵面。
 
 全局 `g_tri_nodes_cal_result`（类型 `TriNodesCalResult`）采用 `uint16_t index` 作为链路唯一键，并使用直接索引缓存：`links[index]`。索引布局为 `[11:10]=txid`、`[9:8]=rxid`、`[7:4]=tx_array_slot`、`[3:0]=rx_array_slot`。注意，4 bit 阵面字段保存的是阵面在所属节点 `arrays[]` 中的槽位（0～15），不是 `ArrayMount.id`；例如阵面 ID 为 11、21、31 时仍可正确编码。`occupied` 位图用于区分尚未写入的槽位和已写入但 `valid=0` 的结果，`count` 表示已登记槽位数。缓存地址可由 `&g_tri_nodes_cal_result.links[index]` 直接得到，`TriNodesCalResult_Get()` 提供带占用检查的访问接口。索引空间为 4096 项；最多 3 个节点、每节点 16 个阵面时，实际有向链路上限为 1536 条。当前平台下结果缓存约占 272.5 KiB（具体值以目标编译器的 `sizeof(TriNodesCalResult)` 为准）。多任务系统中若计算任务和上传任务并发访问，应在外层加临界区或采用双缓冲。
 
