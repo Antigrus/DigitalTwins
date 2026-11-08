@@ -1,4 +1,4 @@
 id,name,enabled,tr_state,trajectory_file,tx_array_id,beam_azimuth_deg,beam_elevation_deg
-1,Node1,1,TX,trajectories/node1.csv,11,0,0
-2,Node2,1,RX,trajectories/node2.csv,-1,0,0
-3,Node3,1,RX,trajectories/node3.csv,-1,0,0
+1,Node1,1,TX,trajectories/node1.csv,1,0,0
+2,Node2,1,RX,trajectories/node2.csv,2,0,0
+3,Node3,1,RX,trajectories/node3.csv,3,0,0
