@@ -67,6 +67,7 @@ int config_load(SimConfig *c, const char *ini) {
         Node *n=&c->nodes[c->nn]; NodePosition *p=&c->positions[c->np];
         memset(n,0,sizeof(*n)); memset(p,0,sizeof(*p));
         if (!parse_state(state_text,&n->tr_state)) { fclose(f); return 0; }
+        if (tx_array_id < -1) { fprintf(stderr,"Node %d has invalid tx_array_id %d (use -1 or a valid array ID)\n",id,tx_array_id); fclose(f); return 0; }
         n->id=id; n->enabled=enabled; n->tx_array_id=tx_array_id; n->beam_direction=(BeamDirection){beam_azimuth,beam_elevation}; snprintf(n->name,sizeof(n->name),"%s",name);
         p->id=id; p->enabled=enabled; snprintf(p->name,sizeof(p->name),"%s",name);
         snprintf(p->trajectory_file,sizeof(p->trajectory_file),"%s",trajectory);
