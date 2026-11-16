@@ -1,4 +1,7 @@
-#include "sim.h"
+#include "config.h"
+#include "beam.h"
+#include "channel.h"
+#include "trajectory.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
