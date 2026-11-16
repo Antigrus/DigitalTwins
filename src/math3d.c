@@ -1,4 +1,4 @@
-#include "sim.h"
+#include "math3d.h"
 #include <math.h>
 
 Vec3 v3(float x, float y, float z) { Vec3 v = {x, y, z}; return v; }
