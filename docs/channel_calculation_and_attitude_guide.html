@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="三节点多阵面信道仿真工程：计算流程、姿态定义、三维坐标系与旋转矩阵原理说明">
+<title>三节点多阵面信道计算流程与三维姿态坐标变换说明</title>
+<style>
+:root{--bg:#f4f7fb;--paper:#fff;--ink:#182334;--muted:#5d6b7c;--line:#dce4ee;--blue:#1769aa;--cyan:#0d8995;--purple:#7052a3;--orange:#bd6b18;--green:#28784c;--code:#101b2a}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 "Segoe UI","Microsoft YaHei",Arial,sans-serif}
+header{background:linear-gradient(120deg,#10253f,#174d75 60%,#147a83);color:white;padding:54px max(24px,calc((100% - 1120px)/2)) 46px}
+header .eyebrow{letter-spacing:.12em;text-transform:uppercase;font-size:12px;opacity:.8}h1{font-size:clamp(30px,4vw,46px);line-height:1.2;margin:12px 0 16px}header p{max-width:850px;color:#e0edf8;margin:0;font-size:17px}
+.layout{max-width:1120px;margin:28px auto;padding:0 22px;display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px}
+nav{position:sticky;top:18px;align-self:start;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px;max-height:calc(100vh - 36px);overflow:auto}
+nav b{display:block;margin-bottom:10px}nav a{display:block;color:var(--muted);text-decoration:none;padding:5px 8px;border-radius:7px;font-size:14px}nav a:hover{background:#edf4fb;color:var(--blue)}
+main{min-width:0}.card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:28px;margin-bottom:20px;box-shadow:0 5px 18px #20364d08}
+h2{font-size:25px;margin:0 0 18px;padding-bottom:10px;border-bottom:1px solid var(--line)}h3{font-size:19px;margin:24px 0 10px;color:#213b58}h4{margin:18px 0 6px}p{margin:9px 0}ul,ol{padding-left:24px}li{margin:5px 0}.muted{color:var(--muted)}.note{border-left:4px solid var(--blue);background:#eef6fc;padding:13px 16px;border-radius:0 9px 9px 0;margin:15px 0}.warn{border-left-color:var(--orange);background:#fff6e9}.good{border-left-color:var(--green);background:#eff8f2}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.mini{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fbfdff}.mini strong{display:block;margin-bottom:5px}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#f0f5fa;color:#30455c}
+code{font-family:Consolas,"Cascadia Code",monospace;background:#eef2f6;padding:2px 5px;border-radius:4px;font-size:.92em}pre{overflow:auto;background:var(--code);color:#e7eff8;padding:17px;border-radius:10px;line-height:1.55;font-size:13px}pre code{background:none;color:inherit;padding:0}
+.math{background:#f6f8fb;border:1px solid var(--line);border-radius:10px;padding:13px 16px;margin:12px 0;font-family:Cambria,"Times New Roman",serif;font-size:17px;overflow-x:auto}
+.flow{display:flex;flex-direction:column;align-items:center;gap:8px;margin:18px auto;max-width:720px}.step{width:min(100%,620px);border:1px solid #b8cde0;background:#f3f8fd;border-radius:10px;padding:12px 16px;text-align:center}.step b{display:block;color:#174d75}.arrow{color:#71869a;font-size:22px;line-height:1}.branch{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%}.branch .step{width:100%}.tag{display:inline-block;border-radius:99px;padding:2px 9px;font-size:12px;background:#e8f1fb;color:#205c8c;margin:2px}
+svg{max-width:100%;height:auto}.diagram{border:1px solid var(--line);border-radius:12px;background:#fbfdff;padding:12px;margin:14px 0}.caption{text-align:center;color:var(--muted);font-size:13px;margin-top:6px}
+footer{max-width:1120px;margin:0 auto;padding:0 22px 40px;color:var(--muted);font-size:13px}
+@media(max-width:850px){.layout{grid-template-columns:1fr}nav{position:relative;top:0;max-height:none}.grid2{grid-template-columns:1fr}}
+@media print{body{background:white}.layout{display:block;margin:0;max-width:none}nav{display:none}.card{box-shadow:none;break-inside:avoid}header{padding:28px;color:#111;background:white;border-bottom:2px solid #333}header p{color:#333}a{color:inherit}}
+</style>
+</head>
+<body>
+<header>
+<div class="eyebrow">DigitalTwins · Channel Simulation Engineering Note</div>
+<h1>三节点多阵面信道计算流程<br>与三维姿态、坐标旋转原理</h1>
+<p>以当前 C 仿真工程为依据，说明从轨迹与节点配置出发，如何确定收发链路、构造节点/阵面/波束姿态，完成全局坐标到阵面局部坐标的转换，并计算方向增益、传播参数和复信道结果。</p>
+</header>
+<div class="layout">
+<nav><b>文档导航</b>
+<a href="#overview">1. 工程模型与总流程</a><a href="#flow">2. 信道计算流程框图</a><a href="#frames">3. 坐标系定义</a><a href="#attitude">4. 三层姿态设计</a><a href="#rotation">5. 旋转矩阵数学原理</a><a href="#transform">6. 坐标转换与角度</a><a href="#channel">7. 信道参数计算</a><a href="#cache">8. 波束表与结果缓存</a><a href="#config">9. 配置字段与使用方法</a><a href="#limits">10. 使用边界与检查建议</a><a href="#source">11. 对应源码</a>
+</nav>
+<main>
+<section class="card" id="overview">
+<h2>1. 工程模型与总流程</h2>
+<p>仿真对象由节点（Node）、节点轨迹（NodePosition）和节点所挂载的阵面（ArrayMount）组成。节点保存收发状态、运动姿态、指定发射阵面及波束扫描角；阵面保存相对节点的位置偏移、固定安装姿态、阵列参数和方向图缓存索引。</p>
+<div class="grid2">
+<div class="mini"><strong>节点级信息</strong>节点 ID、启用状态、TX/RX 半双工状态、轨迹推导的速度与姿态、<code>tx_array_id</code>、波束扫描角。</div>
+<div class="mini"><strong>阵面级信息</strong>阵面 ID、所属节点、相对位置 <code>x/y/z</code>、安装角 <code>yaw/pitch/roll</code>、阵元数、间距、频率和单阵元功率。</div>
+<div class="mini"><strong>计算输出</strong>距离、传播时延、径向速度、多普勒、FSPL、Tx/Rx 增益、接收功率和复信道系数。</div>
+<div class="mini"><strong>结果标识</strong><code>uint16_t index</code> 编码有向节点对和两端阵面槽位，结果缓存按 index 直接寻址。</div>
+</div>
+<div class="note"><b>核心原则：</b>节点姿态、阵面安装姿态、波束扫描姿态是三个不同层次。它们按坐标系从外到内组合，不能把扫描角直接写进安装角，也不能把阵面安装角当成节点姿态。</div>
+</section>
+<section class="card" id="flow">
+<h2>2. 信道计算流程框图</h2>
+<div class="flow">
+<div class="step"><b>初始化</b>读取 simulation.ini、nodes.csv、arrays.csv 与轨迹文件</div><div class="arrow">↓</div>
+<div class="step"><b>建立方向图缓存</b>按阵元数、阵元间距、工作频率生成/复用 BeamTable</div><div class="arrow">↓</div>
+<div class="step"><b>进入仿真时刻 t</b>对每个节点执行 update_state()</div><div class="arrow">↓</div>
+<div class="step"><b>轨迹插值与运动姿态</b>更新位置、速度；由速度计算 heading、pitch，roll 当前置 0</div><div class="arrow">↓</div>
+<div class="step"><b>枚举节点对</b>跳过禁用节点；仅当两节点 TR 状态相反时建立有向链路</div><div class="arrow">↓</div>
+<div class="branch"><div class="step"><b>TX 节点</b>按 tx_array_id 选择指定启用阵面；-1 时枚举全部启用阵面</div><div class="step"><b>RX 节点</b>枚举全部启用接收阵面</div></div>
+<div class="arrow">↓</div>
+<div class="step"><b>阵面组合校验</b>检查阵面归属、启用状态、槽位范围、频率匹配并生成链路 index</div><div class="arrow">↓</div>
+<div class="step"><b>计算阵面全局位置</b>节点位置 + 节点旋转矩阵 × 阵面相对位置偏移</div><div class="arrow">↓</div>
+<div class="step"><b>计算传播几何</b>距离、单位传播方向、时延、径向速度、多普勒、自由空间路径损耗</div><div class="arrow">↓</div>
+<div class="step"><b>Tx / Rx 方向增益</b>组合 R_node · R_mount · R_scan，将全局传播方向变换到阵面局部坐标，查询波束表</div><div class="arrow">↓</div>
+<div class="step"><b>信道结果</b>计算 Gtx、Grx、Pr 与复信道 h，设置 valid</div><div class="arrow">↓</div>
+<div class="step"><b>直接索引缓存</b>TriNodesCalResult_Update() 按 links[index] 更新；同一链路后续时刻覆盖旧结果</div>
+</div>
+<p class="caption">当前主循环的处理顺序示意。流程以 <code>src/main.c</code>、<code>src/trajectory.c</code> 和 <code>src/channel.c</code> 为准。</p>
+<h3>关键分支：谁发射、谁接收？</h3>
+<ul><li>每个节点是半双工节点，节点的 <code>tr_state</code> 决定该节点所有阵面的角色。</li><li>节点对状态相反时，TX 节点指向 RX 节点形成有向链路；状态相同则跳过。</li><li>指定 <code>tx_array_id</code> 时，发射端只使用 ID 匹配的阵面；接收端仍遍历其启用阵面。</li><li><code>tx_array_id=-1</code> 表示发射端自动遍历所有启用阵面。</li></ul>
+</section>
+<section class="card" id="frames">
+<h2>3. 坐标系定义</h2>
+<p>本工程采用右手三维坐标系，以全局坐标系作为位置、速度和传播方向的公共参考。矩阵作用于列向量，<code>apply(R,v)</code> 对应 \(Rv\)。</p>
+<div class="diagram">
+<svg viewBox="0 0 760 300" role="img" aria-label="全局坐标与阵面局部坐标示意">
+<defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="context-stroke" stroke-width="1.4"/></marker></defs>
+<g transform="translate(115 210)" stroke-width="3" fill="none"><path d="M0 0 L120 0" stroke="#1769aa" marker-end="url(#arr)"/><path d="M0 0 L0 -125" stroke="#28784c" marker-end="url(#arr)"/><path d="M0 0 L-68 54" stroke="#bd6b18" marker-end="url(#arr)"/><g fill="#182334" stroke="none" font-size="17"><text x="130" y="5">Xg</text><text x="-17" y="-137">Zg</text><text x="-95" y="73">Yg</text><text x="-5" y="24">O</text></g></g>
+<g transform="translate(490 190) rotate(-15)" stroke-width="3" fill="none"><path d="M0 0 L150 0" stroke="#1769aa" marker-end="url(#arr)"/><path d="M0 0 L0 -125" stroke="#28784c" marker-end="url(#arr)"/><path d="M0 0 L-68 54" stroke="#bd6b18" marker-end="url(#arr)"/><g fill="#182334" stroke="none" font-size="17"><text x="158" y="5">Xa：阵面法向</text><text x="-17" y="-137">Za：垂直阵列轴</text><text x="-105" y="75">Ya：水平阵列轴</text><text x="-5" y="24">Oa</text></g></g>
+<path d="M270 155 C330 95 390 95 440 150" stroke="#7052a3" stroke-width="2" fill="none" stroke-dasharray="6 5"/><text x="315" y="90" fill="#7052a3" font-size="15">旋转变换</text>
+</svg>
+<div class="caption">概念示意：阵面局部坐标系随节点运动姿态和安装姿态一起转动；实际方向由旋转矩阵严格确定。</div>
+</div>
+<table><thead><tr><th>坐标系</th><th>定义 / 用途</th></tr></thead><tbody>
+<tr><td>全局坐标系 G</td><td>节点位置、轨迹、速度、Tx→Rx 传播方向；当前约定 Z 轴向上。</td></tr>
+<tr><td>节点坐标系 N</td><td>节点局部 +X 轴沿运动方向；姿态由 heading、pitch、roll 描述。</td></tr>
+<tr><td>阵面坐标系 A</td><td>阵面局部 +X 为法向/波束正前方，+Y 为水平阵列轴，+Z 为垂直阵列轴。</td></tr>
+<tr><td>扫描后波束坐标系 B</td><td>在阵面局部坐标系中施加扫描方位和俯仰后的指向坐标系。</td></tr>
+</tbody></table>
+<div class="note warn"><b>坐标约定必须一致：</b>方向图表的角度定义为 theta 仰角、phi 方位角，且阵面局部 +X 是 broadside。若硬件方向图使用不同的法向、方位零点或正方向，需要统一修改角度映射，不能只改 CSV 数值。</div>
+</section>
+<section class="card" id="attitude">
+<h2>4. 三层姿态设计与使用</h2>
+<h3>4.1 节点运动姿态 Node Attitude</h3>
+<p>当前仿真不从配置文件直接读取节点姿态，而是由轨迹相邻采样点计算速度，再由速度方向推导节点朝向。对轨迹点 \(P_i=(x_i,y_i,z_i)\)、\(P_{i+1}\) 和时间间隔 \(\Delta t\)：</p>
+<div class="math">v = (P<sub>i+1</sub> − P<sub>i</sub>) / Δt</div>
+<div class="math">heading = atan2(v<sub>y</sub>, v<sub>x</sub>)； pitch = atan2(v<sub>z</sub>, √(v<sub>x</sub>²+v<sub>y</sub>²))； roll = 0</div>
+<ul><li><b>heading：</b>水平面内绕全局 Z 轴的航向角，正方向从 +X 朝 +Y。</li><li><b>pitch：</b>运动方向相对水平面的仰角；向上运动为正。</li><li><b>roll：</b>当前模型固定为 0，未模拟机体绕前向轴滚转。</li></ul>
+<p>因此，节点局部 +X 经节点旋转后指向轨迹速度方向。若速度近似为零，代码保留上一次姿态，不重新计算。</p>
+<h3>4.2 阵面安装姿态 ArrayMount.initial_attitude</h3>
+<p>阵面安装姿态描述阵面相对节点坐标系的固定安装角，CSV 字段为 <code>yaw,pitch,roll</code>。它用于表达阵面在平台上的机械安装方向，不随波束扫描变化。</p>
+<ul><li>yaw：阵面相对节点绕局部 Z 轴的旋转。</li><li>pitch：阵面相对节点绕局部 Y 轴的旋转；代码使用负 pitch 角构造矩阵。</li><li>roll：阵面相对节点绕局部 X 轴的旋转。</li></ul>
+<p>阵面相对节点的位置偏移 <code>x,y,z</code> 与安装姿态是两类数据：位置偏移用于计算阵面相位中心的位置；安装姿态用于计算阵面朝向。当前偏移向量按节点坐标系表达。</p>
+<h3>4.3 波束扫描姿态 BeamDirection</h3>
+<p>节点字段 <code>beam_direction.azimuth/elevation</code> 是扫描角，定义在每个阵面的局部坐标系中。它在固定安装姿态之后叠加，当前同一节点的阵面共用这组扫描角。</p>
+<ul><li>扫描 azimuth：绕阵面局部 Z 轴转动，使 +X 波束轴朝局部水平面内的方位方向偏转。</li><li>扫描 elevation：通过绕局部 Y 轴的负角旋转，使 +X 波束轴向局部 +Z 抬起。</li><li>扫描角为 0、0 时，波束轴与阵面安装后的局部 +X 法向一致。</li></ul>
+<div class="math">R<sub>beam</sub> = R<sub>node</sub> · R<sub>mount</sub> · R<sub>scan</sub></div>
+<div class="note good"><b>使用建议：</b>机械安装角写入 <code>arrays.csv</code>；动态平台姿态由轨迹更新；电子扫描角写入 <code>nodes.csv</code> 的 <code>beam_azimuth_deg/beam_elevation_deg</code>。三者职责分离，修改扫描角不会覆盖安装姿态。</div>
+<h3>4.4 三种姿态的作用边界</h3>
+<table><thead><tr><th>姿态</th><th>来源</th><th>改变什么</th><th>不应承担的职责</th></tr></thead><tbody>
+<tr><td>节点姿态</td><td>轨迹速度方向</td><td>整个节点及所挂阵面的全局朝向；阵面位置偏移的全局方向</td><td>不表达阵面独立机械安装角或电子扫描角</td></tr>
+<tr><td>阵面安装姿态</td><td>arrays.csv</td><td>阵面相对节点的固定朝向</td><td>不应随每次波束扫描动态覆盖</td></tr>
+<tr><td>波束扫描姿态</td><td>nodes.csv</td><td>波束相对阵面法向的指向偏移</td><td>不改变阵面机械位置或安装姿态</td></tr>
+</tbody></table>
+</section>
+<section class="card" id="rotation">
+<h2>5. 旋转矩阵的数学原理</h2>
+<h3>5.1 为什么使用旋转矩阵</h3>
+<p>三维姿态可以理解为一个坐标系相对另一个坐标系的方向关系。旋转矩阵把一个坐标系中的向量映射到另一个坐标系。使用列向量时，若 \(v_A\) 是阵面局部坐标，\(v_G\) 是全局坐标，则：</p>
+<div class="math">v<sub>G</sub> = R<sub>G←A</sub> v<sub>A</sub></div>
+<p>旋转矩阵的列向量分别是局部 X、Y、Z 三个单位轴在目标坐标系中的表达。纯旋转矩阵满足正交性：</p>
+<div class="math">R<sup>T</sup>R = I， det(R)=+1， 因此 R<sup>−1</sup> = R<sup>T</sup></div>
+<p>所以全局向量变换回局部坐标时，不必求一般矩阵逆，只需乘旋转矩阵的转置。</p>
+<h3>5.2 绕三个坐标轴的基本旋转</h3>
+<p>代码中的 <code>rx</code>、<code>ry</code>、<code>rz</code> 均使用右手定则，角度传入弧度。对列向量：</p>
+<div class="math">R<sub>x</sub>(α) = [ [1,0,0], [0,cosα,−sinα], [0,sinα,cosα] ]</div>
+<div class="math">R<sub>y</sub>(β) = [ [cosβ,0,sinβ], [0,1,0], [−sinβ,0,cosβ] ]</div>
+<div class="math">R<sub>z</sub>(γ) = [ [cosγ,−sinγ,0], [sinγ,cosγ,0], [0,0,1] ]</div>
+<h3>5.3 本工程欧拉角顺序</h3>
+<p><code>math3d.c</code> 中的 <code>euler()</code> 明确采用以下乘法顺序：</p>
+<div class="math">R(heading,pitch,roll) = R<sub>z</sub>(heading) · R<sub>y</sub>(−pitch) · R<sub>x</sub>(roll)</div>
+<p>矩阵乘法不满足交换律：一般而言 \(R_xR_y \ne R_yR_x\)。因此欧拉角顺序是工程定义的一部分，不能任意交换。当前代码中 pitch 使用负号，是为了让局部 +X 轴在正 pitch 时向全局 +Z 抬起。</p>
+<p>验证这一点：令 roll=0，先将局部前向单位向量 \(e_x=[1,0,0]^T\) 旋转：</p>
+<div class="math">R<sub>z</sub>(h)R<sub>y</sub>(−p)e<sub>x</sub> = [cos p cos h, cos p sin h, sin p]<sup>T</sup></div>
+<p>这与轨迹速度方向的 heading、pitch 定义一致。</p>
+<h3>5.4 坐标层级的矩阵组合</h3>
+<div class="math">R<sub>G←N</sub> = R<sub>node</sub></div>
+<div class="math">R<sub>G←A</sub> = R<sub>G←N</sub> R<sub>N←A</sub> = R<sub>node</sub> R<sub>mount</sub></div>
+<div class="math">R<sub>G←B</sub> = R<sub>node</sub> R<sub>mount</sub> R<sub>scan</sub></div>
+<p>从右向左理解：先在最内层阵面坐标系施加扫描旋转，再经过阵面安装旋转，最后经过节点运动旋转，得到全局方向。代码中的 <code>compose_rot(a,b)</code> 返回 \(a·b\)。</p>
+<div class="note warn"><b>常见错误：</b>把矩阵乘法顺序反过来、对全局方向使用 R 而不是 Rᵀ、把角度制直接传给 sin/cos、或混淆主动旋转向量与被动旋转坐标系。上述任一问题都可能让波束指向偏离预期。</div>
+</section>
+<section class="card" id="transform">
+<h2>6. 坐标转换与方向角计算</h2>
+<h3>6.1 阵面全局位置</h3>
+<p>阵面偏移 \(p_{offset}\) 在节点局部坐标系中给出。当前代码先使用节点旋转矩阵将偏移转换到全局，再与节点全局位置相加：</p>
+<div class="math">P<sub>array,G</sub> = P<sub>node,G</sub> + R<sub>node</sub> p<sub>offset,N</sub></div>
+<p>注意：位置偏移只乘节点姿态矩阵，不乘阵面安装姿态矩阵。因为配置中的偏移描述阵面安装点在节点坐标系中的位置，而不是阵面自身局部坐标中的偏移。</p>
+<h3>6.2 Tx 到 Rx 的全局传播方向</h3>
+<div class="math">ΔP = P<sub>rx,array</sub> − P<sub>tx,array</sub>； d = ||ΔP||； u = ΔP / d</div>
+<p>其中 \(u\) 是 Tx 指向 Rx 的全局单位向量。发射端沿 \(u\) 方向观察接收端；接收端的入射方向则是 \(-u\)。因此 Rx 方向增益调用时传入反向向量。</p>
+<h3>6.3 转换到波束局部坐标</h3>
+<p>发射端和接收端分别构造自己的总旋转矩阵 \(R_{beam}\)。全局方向转到局部方向：</p>
+<div class="math">u<sub>local</sub> = R<sub>beam</sub><sup>T</sup> u<sub>global</sub></div>
+<p>代码实现对应 <code>apply(transpose(r), direction_global)</code>。接收端则使用 <code>direction_global = -u</code>。这一步将“世界里传播方向指向哪里”转换为“从阵面自身看，来波/去波来自哪个局部角度”。</p>
+<h3>6.4 从局部方向向量得到 theta、phi</h3>
+<p>本工程方向图约定：theta 是仰角，phi 是相对阵面法向的方位角；局部 +X 是法向，+Y 为水平阵列轴，+Z 为垂直阵列轴。</p>
+<div class="math">theta = atan2(z<sub>local</sub>, √(x<sub>local</sub>²+y<sub>local</sub>²))</div>
+<div class="math">phi = atan2(y<sub>local</sub>, |x<sub>local</sub>|)</div>
+<p>计算结果转换为度后，送入 <code>beam_gain()</code>。该函数将角度限制在 −90° 到 +90°，并对 181×181 方向图做双线性插值。</p>
+<div class="note"><b>物理解释：</b>姿态矩阵负责把方向向量表达在正确的阵面局部坐标系里；theta/phi 只负责把局部向量映射成方向图索引。两步不能混为一谈。</div>
+</section>
+<section class="card" id="channel">
+<h2>7. 信道参数计算</h2>
+<h3>7.1 距离与传播时延</h3>
+<div class="math">d = ||P<sub>rx,array</sub> − P<sub>tx,array</sub>||； τ = d/c</div>
+<p>其中 \(c\) 为光速常数 <code>C0</code>。当前模型为单径自由空间 LOS。</p>
+<h3>7.2 径向速度与多普勒</h3>
+<div class="math">v<sub>r</sub> = (v<sub>rx</sub> − v<sub>tx</sub>) · u</div>
+<div class="math">f<sub>d</sub> = −v<sub>r</sub> f<sub>c</sub> / c</div>
+<p>这里 \(u\) 是 Tx 指向 Rx 的单位向量。按当前符号约定，\(v_r&gt;0\) 表示两端沿链路方向相对远离，对应负多普勒；靠近时符号相反。</p>
+<h3>7.3 自由空间路径损耗</h3>
+<div class="math">FSPL = 20 log<sub>10</sub>(4π d f<sub>c</sub> / c)</div>
+<p>Tx/Rx 工作频率不一致（容差 <code>1e-6 MHz</code>）时，该阵面组合被判为不可用。</p>
+<h3>7.4 方向增益与接收功率</h3>
+<p>方向图缓存保存线性场幅度 \(A\)，而不是 dB。代码将其转换为：</p>
+<div class="math">G<sub>tx,dB</sub> = 20log<sub>10</sub>(A<sub>tx</sub>)； G<sub>rx,dB</sub> = 20log<sub>10</sub>(A<sub>rx</sub>)</div>
+<div class="math">P<sub>r</sub> = P<sub>element</sub> + 10log<sub>10</sub>(M<sub>tx</sub>N<sub>tx</sub>) + G<sub>tx</sub> + G<sub>rx</sub> − FSPL</div>
+<p>发射阵列阵元数 \(M_{tx}N_{tx}\) 用于把单阵元发射功率换算为阵列总输入功率。当前为理想均匀同相馈电模型，未包含馈线损耗、阵元方向图、互耦、极化失配和硬件幅相误差。</p>
+<h3>7.5 复信道系数</h3>
+<div class="math">|h| = √(M<sub>tx</sub>N<sub>tx</sub>) A<sub>tx</sub>A<sub>rx</sub> λ/(4πd)</div>
+<div class="math">∠h = −2π f<sub>c</sub> τ； h = |h|[cos(∠h)+j sin(∠h)]</div>
+<p>结果写入 <code>h.re</code>、<code>h.im</code>。该 h 以单个 Tx 阵元输入信号为参考，已包含理想相干 Tx 阵列合成、Rx 方向响应和自由空间传播项；与链路预算结合时需保持功率参考一致，避免重复乘阵元数。</p>
+</section>
+<section class="card" id="cache">
+<h2>8. 波束表与信道结果缓存</h2>
+<h3>8.1 波束表缓存</h3>
+<p>全局 <code>g_beam_cache</code> 按阵列参数组合共享方向图。缓存键包括横/纵阵元数、横/纵间距和工作频率。阵面安装角、节点姿态和扫描角不属于缓存键，因为它们只影响方向向量在局部坐标系中的表达，不改变阵列自身的方向图表。</p>
+<p>表大小为 181×181，theta、phi 均覆盖 −90° 到 +90°。查询时使用双线性插值。方向图计算使用均匀矩形阵列可分离形式，等价于二维阵元相位复数求和的幅度表达。</p>
+<h3>8.2 uint16_t 链路索引</h3>
+<table><thead><tr><th>位段</th><th>字段</th><th>说明</th></tr></thead><tbody><tr><td>[11:10]</td><td>txid</td><td>2 bit 节点 ID</td></tr><tr><td>[9:8]</td><td>rxid</td><td>2 bit 节点 ID</td></tr><tr><td>[7:4]</td><td>tx_array_slot</td><td>发射阵面在 tx->arrays[] 中的槽位 0～15</td></tr><tr><td>[3:0]</td><td>rx_array_slot</td><td>接收阵面在 rx->arrays[] 中的槽位 0～15</td></tr><tr><td>[15:12]</td><td>保留</td><td>当前未使用</td></tr></tbody></table>
+<p>索引空间为 4096 项。缓存结构使用 <code>links[index]</code> 直接定位结果，并用 <code>occupied</code> 位图标识该索引是否已登记；因此查询为 O(1)，且能区分“没有结果”和“已登记但 valid=0”。</p>
+<div class="note warn"><b>索引约束：</b>当前编码函数要求节点 ID 在 0～3 且 TX/RX 节点不同；每端最多 16 个阵面。4 bit 阵面字段保存的是节点数组中的槽位，不是外部阵面 ID。节点 ID 若改为更大或非 0～3 的值，必须增加 ID 到编码值的映射或重新设计位宽。</div>
+</section>
+<section class="card" id="config">
+<h2>9. 配置字段与使用方法</h2>
+<h3>9.1 nodes.csv</h3>
+<pre><code>id,name,enabled,tr_state,trajectory_file,tx_array_id,beam_azimuth_deg,beam_elevation_deg
+1,Node1,1,TX,trajectories/node1.csv,1,0,0
+2,Node2,1,RX,trajectories/node2.csv,2,0,0
+3,Node3,1,RX,trajectories/node3.csv,3,0,0</code></pre>
+<ul><li><code>tx_array_id</code> 是该节点指定发射阵面的 ArrayMount.id；−1 表示自动选择。</li><li>当前示例令节点 ID 与指定发射阵面 ID 相同，仅为便于演示；实际两者可以不同。</li><li><code>beam_azimuth_deg</code>、<code>beam_elevation_deg</code> 是阵面局部扫描角，单位为度。</li></ul>
+<h3>9.2 arrays.csv</h3>
+<pre><code>array_id,node_id,name,enabled,x,y,z,yaw,pitch,roll,num_h,num_v,spacing_h_cm,spacing_v_cm,frequency_mhz,element_tx_power_dbm
+1,1,A1,1,0,0,0,0,0,0,16,8,7.5,7.5,2000,20
+2,2,A2,1,0,0,0,0,0,0,16,8,7.5,7.5,2000,20
+3,3,A3,1,0,0,0,0,0,0,8,8,7.5,7.5,2000,18</code></pre>
+<p><code>x,y,z</code> 是阵面相对节点的位置偏移；<code>yaw,pitch,roll</code> 是阵面相对节点的固定安装角；<code>num_h/num_v</code> 是横纵阵元数；间距单位 cm；频率单位 MHz；单阵元发射功率单位 dBm。</p>
+<h3>9.3 轨迹文件</h3>
+<pre><code>time_s,x_m,y_m,z_m
+0,0,0,10
+1,1,0,10
+2,2,1,10</code></pre>
+<p>轨迹时间严格递增，至少两个有效采样点。位置在相邻采样点间线性插值；速度按该轨迹段差分计算。当前姿态由该速度方向推导。</p>
+<h3>9.4 运行</h3>
+<pre><code>make clean
+make
+./channel_sim config/simulation.ini
+./channel_sim config/simulation.ini --time 2.5</code></pre>
+</section>
+<section class="card" id="limits">
+<h2>10. 使用边界与检查建议</h2>
+<ol>
+<li><b>姿态顺序固定：</b>当前为 Rz(heading)·Ry(−pitch)·Rx(roll)，扫描为 Rz(azimuth)·Ry(−elevation)。修改前应使用已知向量验证。</li>
+<li><b>角度单位：</b>配置角度以度为单位；构造矩阵时转换为弧度。不要把度直接传给 sinf/cosf。</li>
+<li><b>节点静止：</b>速度模长很小时保留旧姿态；若场景需要静止时指定朝向，应增加独立姿态输入或静止姿态配置。</li>
+<li><b>roll 的局限：</b>当前轨迹推导姿态把 roll 固定为 0，不能描述平台真实滚转；可后续接入姿态传感器或姿态关键帧。</li>
+<li><b>阵面偏移：</b>当前 offset 在节点坐标系中表达，仅乘 R_node。若未来改成阵面局部偏移，必须同步调整位置变换。</li>
+<li><b>接收方向：</b>接收端方向图使用 −u；若误用 +u，会把接收波束角度算反。</li>
+<li><b>局部角定义：</b>当前 phi 使用 atan2(y,|x|)，theta 使用仰角定义。需要与硬件方向图生成程序的角度定义逐项核对。</li>
+<li><b>模型适用范围：</b>当前是单径 LOS 自由空间模型，不含反射、多径、遮挡、阴影衰落和噪声。</li>
+<li><b>缓存容量：</b>方向图缓存默认最多 8 张；结果索引空间固定 4096 项。两种缓存的容量和键定义不同。</li>
+<li><b>并发访问：</b>若计算任务与通信/上传任务并发读写结果缓存，应使用临界区、互斥锁或双缓冲。</li>
+</ol>
+<h3>建议的姿态单元测试</h3>
+<table><thead><tr><th>测试输入</th><th>期望方向（节点/扫描局部 +X）</th><th>验证点</th></tr></thead><tbody>
+<tr><td>heading=0°, pitch=0°, roll=0°</td><td>[1,0,0]</td><td>无旋转时 +X 保持不变</td></tr>
+<tr><td>heading=90°, pitch=0°, roll=0°</td><td>[0,1,0]</td><td>航向正方向为 +X 转向 +Y</td></tr>
+<tr><td>heading=0°, pitch=30°, roll=0°</td><td>[cos30°,0,sin30°]</td><td>正 pitch 抬高局部 +X</td></tr>
+<tr><td>scan az=90°, el=0°</td><td>阵面局部 [0,1,0]</td><td>扫描方位绕局部 Z 轴</td></tr>
+<tr><td>scan az=0°, el=30°</td><td>阵面局部 [cos30°,0,sin30°]</td><td>扫描俯仰向局部 +Z 抬高</td></tr>
+</tbody></table>
+</section>
+<section class="card" id="source">
+<h2>11. 对应源码与阅读顺序</h2>
+<table><thead><tr><th>文件</th><th>重点内容</th></tr></thead><tbody>
+<tr><td><code>include/sim.h</code></td><td>Node、ArrayMount、Attitude、BeamDirection、ChannelResult、链路索引定义。</td></tr>
+<tr><td><code>src/main.c</code></td><td>初始化方向图缓存、按仿真时刻更新状态、枚举有向节点链路与阵面组合。</td></tr>
+<tr><td><code>src/trajectory.c</code></td><td>轨迹读取、线性插值、速度计算和节点 heading/pitch/roll 更新。</td></tr>
+<tr><td><code>src/math3d.c</code></td><td>基本向量运算、Rx/Ry/Rz、欧拉角顺序、矩阵组合与矩阵向量乘法。</td></tr>
+<tr><td><code>src/channel.c</code></td><td>阵面全局位置、总姿态矩阵、全局到局部方向转换、theta/phi、信道参数计算。</td></tr>
+<tr><td><code>src/beam.c</code></td><td>方向图生成与复用、双线性插值、按 uint16_t index 直接缓存信道结果。</td></tr>
+<tr><td><code>src/config.c</code></td><td>节点、阵面、轨迹配置解析及指定发射阵面检查。</td></tr>
+</tbody></table>
+<div class="note good">阅读建议：先看 <code>trajectory.c</code> 理解节点姿态来源，再看 <code>math3d.c</code> 理解矩阵约定，随后阅读 <code>channel.c</code> 中的 <code>array_gain_amplitude()</code>。这条路径最容易把“姿态如何影响方向图查询”串起来。</div>
+</section>
+</main>
+</div>
+<footer>文档依据 DigitalTwins 仓库当前 main 分支源码整理。数学公式采用 HTML 文本排版，无需联网或额外 JavaScript 库；可直接在浏览器打开，也可打印为 PDF。</footer>
+</body></html>
