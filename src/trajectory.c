@@ -1,4 +1,5 @@
-#include "sim.h"
+#include "trajectory.h"
+#include "math3d.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
