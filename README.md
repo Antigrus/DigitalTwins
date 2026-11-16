@@ -1,6 +1,6 @@
 # 三节点多阵面信道模拟工程（波束表缓存版）
 
-> **详细工程说明：** 结构体设计、接口函数、波束表缓存复用、节点/阵面数量扩展、DSP 移植注意事项请阅读 [`docs/engineering_guide.md`](docs/engineering_guide.md)。
+> **工程文档：** [模块化目录与头文件/源文件对应关系](docs/module_architecture.html) · [详细工程说明](docs/engineering_guide.md) · [姿态与坐标旋转说明](docs/channel_calculation_and_attitude_guide.html)。
 
 ## 1. 本版本改动
 
