@@ -66,6 +66,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 22px 40px;color:var(--muted);fon
 <div class="step"><b>直接索引缓存</b>TriNodesCalResult_Update() 按 links[index] 更新；同一链路后续时刻覆盖旧结果</div>
 </div>
 <p class="caption">当前主循环的处理顺序示意。流程以 <code>src/main.c</code>、<code>src/trajectory.c</code> 和 <code>src/channel.c</code> 为准。</p>
+<p>工程模块化目录、头文件与源文件对应关系请参阅 <a href="module_architecture.html">模块化结构说明</a>。</p>
 <h3>关键分支：谁发射、谁接收？</h3>
 <ul><li>每个节点是半双工节点，节点的 <code>tr_state</code> 决定该节点所有阵面的角色。</li><li>节点对状态相反时，TX 节点指向 RX 节点形成有向链路；状态相同则跳过。</li><li>指定 <code>tx_array_id</code> 时，发射端只使用 ID 匹配的阵面；接收端仍遍历其启用阵面。</li><li><code>tx_array_id=-1</code> 表示发射端自动遍历所有启用阵面。</li></ul>
 </section>
@@ -244,7 +245,12 @@ make
 <section class="card" id="source">
 <h2>11. 对应源码与阅读顺序</h2>
 <table><thead><tr><th>文件</th><th>重点内容</th></tr></thead><tbody>
-<tr><td><code>include/sim.h</code></td><td>Node、ArrayMount、Attitude、BeamDirection、ChannelResult、链路索引定义。</td></tr>
+<tr><td><code>include/sim_types.h</code></td><td>跨模块公共类型、常量、Node、ArrayMount、ChannelResult 和链路索引定义。</td></tr>
+<tr><td><code>include/math3d.h / src/math3d.c</code></td><td>三维向量、旋转矩阵和欧拉角运算接口与实现。</td></tr>
+<tr><td><code>include/trajectory.h / src/trajectory.c</code></td><td>轨迹读取、位置插值、速度和节点姿态更新。</td></tr>
+<tr><td><code>include/beam.h / src/beam.c</code></td><td>方向图生成、查表和信道结果缓存。</td></tr>
+<tr><td><code>include/channel.h / src/channel.c</code></td><td>阵面坐标变换、方向增益和 LOS 信道计算。</td></tr>
+<tr><td><code>include/config.h / src/config.c</code></td><td>节点、阵面、轨迹配置解析及指定发射阵面检查。</td></tr>
 <tr><td><code>src/main.c</code></td><td>初始化方向图缓存、按仿真时刻更新状态、枚举有向节点链路与阵面组合。</td></tr>
 <tr><td><code>src/trajectory.c</code></td><td>轨迹读取、线性插值、速度计算和节点 heading/pitch/roll 更新。</td></tr>
 <tr><td><code>src/math3d.c</code></td><td>基本向量运算、Rx/Ry/Rz、欧拉角顺序、矩阵组合与矩阵向量乘法。</td></tr>
