@@ -1,4 +1,4 @@
-#include "sim.h"
+#include "beam.h"
 #include <math.h>
 #include <string.h>
 
