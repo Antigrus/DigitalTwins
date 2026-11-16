@@ -1,4 +1,6 @@
-#include "sim.h"
+#include "channel.h"
+#include "math3d.h"
+#include "beam.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
