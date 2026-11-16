@@ -18,28 +18,36 @@
 ### 1.1 目录结构
 
 ```text
-three_node_channel_sim_c_v3/
+DigitalTwins/
 ├── include/
-│   └── sim.h                 # 全部公共结构体、宏定义和接口声明
+│   ├── sim_types.h          # 跨模块公共类型、常量和容量定义
+│   ├── config.h             # 配置加载/释放及对象查找接口
+│   ├── trajectory.h         # 轨迹读取和节点状态更新接口
+│   ├── math3d.h             # 三维向量、矩阵和旋转接口
+│   ├── beam.h               # 波束表生成/查询和信道结果缓存接口
+│   ├── channel.h            # 阵面链路信道计算接口
+│   └── sim.h                # 兼容性聚合头文件
 ├── src/
-│   ├── main.c                # 示例主流程、链路枚举和控制台输出
-│   ├── config.c              # INI/CSV 配置解析和对象初始化
-│   ├── trajectory.c          # 轨迹加载、位置/速度/姿态更新
-│   ├── math3d.c              # 三维向量和旋转矩阵运算
-│   ├── beam.c                # 阵列方向图计算、缓存、查表
-│   └── channel.c              # 阵面位置、方向增益和 LOS 信道计算
+│   ├── main.c               # 应用入口和仿真流程编排
+│   ├── config.c             # INI/CSV 配置解析
+│   ├── trajectory.c         # 轨迹插值、速度和节点姿态更新
+│   ├── math3d.c             # 向量、矩阵和欧拉角运算
+│   ├── beam.c               # 方向图生成、查询和缓存
+│   └── channel.c            # 阵面位置、方向增益和 LOS 信道
 ├── config/
 │   ├── simulation.ini
 │   ├── nodes.csv
 │   ├── arrays.csv
-│   └── trajectories/          # 各节点轨迹文件
+│   └── trajectories/
 ├── docs/
-│   ├── design_notes.md
-│   └── engineering_guide.md   # 本说明文档
+│   ├── module_architecture.html
+│   ├── channel_calculation_and_attitude_guide.html
+│   └── engineering_guide.md
 ├── Makefile
 └── README.md
 ```
 
+每个可复用功能模块采用同名头文件/源文件配对：`config.h/config.c`、`trajectory.h/trajectory.c`、`math3d.h/math3d.c`、`beam.h/beam.c`、`channel.h/channel.c`。公共数据类型集中在 `sim_types.h`，避免模块头文件互相包含。`sim.h` 仅作为兼容性聚合头文件保留；新代码建议按需包含具体模块头文件。`main.c` 是程序入口，不提供模块 API，因此不设置无实际用途的 `main.h`。
 ### 1.2 初始化与运行的总体顺序
 
 ```text
