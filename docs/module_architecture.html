@@ -1,0 +1,5 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DigitalTwins 模块架构</title><style>body{max-width:980px;margin:30px auto;padding:0 18px;font:16px/1.7 system-ui,"Microsoft YaHei",sans-serif;color:#24344a}h1,h2{color:#174d75}pre{background:#eef3f8;padding:16px;border-radius:8px;overflow:auto}</style></head><body><h1>DigitalTwins 模块架构（ECEF）</h1><p>当前工程使用模块化 C11 实现多节点、多阵面 LOS 信道计算。</p><pre>include/  sim_types.h geodesy.h config.h trajectory.h math3d.h beam.h channel.h sim.h
+src/      main.c config.c trajectory.c geodesy.c math3d.c beam.c channel.c
+config/   simulation.ini nodes.csv arrays.csv trajectories/*.csv
+docs/    engineering_guide.md ecef_coordinate_system.md channel_calculation_and_attitude_guide.html</pre><h2>职责边界</h2><ul><li>geodesy：WGS-84 GEO/ECEF 与 NED/ECEF。</li><li>config：配置解析、资源检查。</li><li>trajectory：轨迹读入、ECEF插值、速度与姿态。</li><li>math3d：向量、矩阵、姿态旋转。</li><li>beam：方向图计算/缓存。</li><li>channel：阵面坐标、方向增益、LOS信道。</li><li>main：仿真编排、结果打印。</li></ul><h2>编译测试</h2><pre>make clean && make
+make test</pre><p>详细说明请阅读工程说明文档。</p>
