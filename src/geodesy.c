@@ -1,0 +1,9 @@
+#include "geodesy.h"
+#include <math.h>
+Vec3d geodetic_to_ecef(Geodetic g){double lat=g.latitude_deg*GEO_DEG_TO_RAD,lon=g.longitude_deg*GEO_DEG_TO_RAD,sl=sin(lat),cl=cos(lat),so=sin(lon),co=cos(lon),n=WGS84_A/sqrt(1.0-WGS84_E2*sl*sl);return (Vec3d){(n+g.altitude_m)*cl*co,(n+g.altitude_m)*cl*so,(n*(1.0-WGS84_E2)+g.altitude_m)*sl};}
+int ecef_to_geodetic(Vec3d p,Geodetic *g){if(!g||!isfinite(p.x)||!isfinite(p.y)||!isfinite(p.z))return 0;double lon=atan2(p.y,p.x),rho=hypot(p.x,p.y);if(rho<1e-9){g->latitude_deg=p.z>=0?90.0:-90.0;g->longitude_deg=0.0;g->altitude_m=fabs(p.z)-WGS84_A*sqrt(1.0-WGS84_E2);return 1;}double lat=atan2(p.z,rho*(1.0-WGS84_E2)),h=0;for(int i=0;i<12;i++){double s=sin(lat),n=WGS84_A/sqrt(1.0-WGS84_E2*s*s);h=rho/cos(lat)-n;double next=atan2(p.z,rho*(1.0-WGS84_E2*n/(n+h)));if(fabs(next-lat)<1e-14){lat=next;break;}lat=next;}double s=sin(lat),n=WGS84_A/sqrt(1.0-WGS84_E2*s*s);h=fabs(cos(lat))>1e-12?rho/cos(lat)-n:p.z/s-n*(1.0-WGS84_E2);g->latitude_deg=lat*GEO_RAD_TO_DEG;g->longitude_deg=lon*GEO_RAD_TO_DEG;g->altitude_m=h;return 1;}
+Mat3d ned_to_ecef_matrix(double latd,double lond){double p=latd*GEO_DEG_TO_RAD,l=lond*GEO_DEG_TO_RAD,sp=sin(p),cp=cos(p),sl=sin(l),cl=cos(l);Mat3d r={{{-sp*cl,-sl,-cp*cl},{-sp*sl,cl,-cp*sl},{cp,0.0,-sp}}};return r;}
+Mat3d ecef_to_ned_matrix(double lat,double lon){return mat3d_transpose(ned_to_ecef_matrix(lat,lon));}
+Vec3d mat3d_apply(Mat3d m,Vec3d v){return (Vec3d){m.m[0][0]*v.x+m.m[0][1]*v.y+m.m[0][2]*v.z,m.m[1][0]*v.x+m.m[1][1]*v.y+m.m[1][2]*v.z,m.m[2][0]*v.x+m.m[2][1]*v.y+m.m[2][2]*v.z};}
+Mat3d mat3d_transpose(Mat3d m){Mat3d r;for(int i=0;i<3;i++)for(int j=0;j<3;j++)r.m[i][j]=m.m[j][i];return r;}
+Mat3d mat3d_multiply(Mat3d a,Mat3d b){Mat3d r={{{0}}};for(int i=0;i<3;i++)for(int j=0;j<3;j++)for(int k=0;k<3;k++)r.m[i][j]+=a.m[i][k]*b.m[k][j];return r;}
